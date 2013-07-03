@@ -23,7 +23,6 @@
     formidable = require('formidable'),
     nodeStatic = require('node-static'),
     gm = require('gm'),
-    fs = require('fs'),
     options = {
       tmpDir: __dirname + '/tmp',
       publicDir: __dirname + '/public',
