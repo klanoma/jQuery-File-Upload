@@ -252,7 +252,8 @@
                   cropY = opts.height;
                 }
 
-                this.resize(sizeX, sizeY)
+                this.gravity('Center')
+                  .resize(sizeX, sizeY)
                   .crop(cropX, cropY)
                   .stream(function(err, stdout, stderr) {
                   if (err) return cb(err);
