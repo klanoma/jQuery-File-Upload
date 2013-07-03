@@ -38,7 +38,7 @@
       safeFileTypes: /\.(gif|jpe?g|png)$/i,
       imageTypes: /\.(gif|jpe?g|png)$/i,
       imageVersions: {
-        'thumbnail': { width: 80, height: 80 }
+        'avatar': { width: 200, height: 200 }
       },
       accessControl: {
         allowOrigin: '*',
@@ -227,16 +227,45 @@
             dstPath = options.uploadDir + '/' + version + '/' + fileInfo.name;
 
           gm(fs.createReadStream(srcPath))
-            .resize(opts.width, opts.height)
-            .crop(opts.width, opts.height)
-            .stream(function(err, stdout, stderr) {
-            if (err) return cb(err);
+            .colorspace('RGB')
+            .interlace('Plane')
+            .size({
+              bufferStream: true
+            }, function(err, size) {
+              if (err || !size) {
+                console.log(err);
+                finish(err);
+              } else {
+                var sizeX = 0,
+                    sizeY = 0,
+                    cropX = 0,
+                    cropY = 0;
 
-            stdout.setMaxListeners(1000);
-            stdout.pipe(fs.createWriteStream(dstPath));
+                if (size.height < size.width) {
+                  sizeX = size.width;
+                  sizeY = opts.width;
+                  cropX = opts.height;
+                  cropY = sizeY;
+                } else {
+                  sizeX = opts.width;
+                  sizeY = size.height;
+                  cropX = sizeX;
+                  cropY = opts.height;
+                }
 
-            stdout.on('end', finish);
-          });
+                this.resize(sizeX, sizeY)
+                  .crop(cropX, cropY)
+                  .stream(function(err, stdout, stderr) {
+                  if (err) return cb(err);
+
+                  stdout.setMaxListeners(1000);
+                  stdout.pipe(fs.createWriteStream(dstPath));
+
+                  stdout.on('end', finish);
+
+                });
+              }
+            });
         });
       }
     }).on('aborted', function() {
