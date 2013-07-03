@@ -22,7 +22,8 @@
     _existsSync = fs.existsSync || path.existsSync,
     formidable = require('formidable'),
     nodeStatic = require('node-static'),
-    imageMagick = require('imagemagick'),
+    gm = require('gm'),
+    fs = require('fs'),
     options = {
       tmpDir: __dirname + '/tmp',
       publicDir: __dirname + '/public',
@@ -37,22 +38,13 @@
       safeFileTypes: /\.(gif|jpe?g|png)$/i,
       imageTypes: /\.(gif|jpe?g|png)$/i,
       imageVersions: {
-        'thumbnail': {
-          width: 80,
-          height: 80
-        }
+        'thumbnail': { width: 80, height: 80 }
       },
       accessControl: {
         allowOrigin: '*',
         allowMethods: 'OPTIONS, HEAD, GET, POST, PUT, DELETE',
         allowHeaders: 'Content-Type, Content-Range, Content-Disposition'
       },
-      /* Uncomment and edit this section to provide the service via HTTPS:
-            ssl: {
-                key: fs.readFileSync('/Applications/XAMPP/etc/ssl.key/server.key'),
-                cert: fs.readFileSync('/Applications/XAMPP/etc/ssl.crt/server.crt')
-            },
-            */
       nodeStatic: {
         cache: 3600 // seconds to cache served files
       }
@@ -77,37 +69,22 @@
       this.callback = callback;
     },
     serve = function(req, res) {
-      res.setHeader(
-        'Access-Control-Allow-Origin',
-        options.accessControl.allowOrigin);
-      res.setHeader(
-        'Access-Control-Allow-Methods',
-        options.accessControl.allowMethods);
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        options.accessControl.allowHeaders);
+      res.setHeader('Access-Control-Allow-Origin', options.accessControl.allowOrigin);
+      res.setHeader('Access-Control-Allow-Methods', options.accessControl.allowMethods);
+      res.setHeader('Access-Control-Allow-Headers', options.accessControl.allowHeaders);
       var handleResult = function(result, redirect) {
         if (redirect) {
-          res.writeHead(302, {
-            'Location': redirect.replace(
-              /%s/,
-              encodeURIComponent(JSON.stringify(result)))
-          });
+          res.writeHead(302, { 'Location': redirect.replace(/%s/, encodeURIComponent(JSON.stringify(result))) });
           res.end();
         } else {
-          res.writeHead(200, {
-            'Content-Type': req.headers.accept
-              .indexOf('application/json') !== -1 ? 'application/json' : 'text/plain'
-          });
+          res.writeHead(200, { 'Content-Type': req.headers.accept.indexOf('application/json') !== -1 ? 'application/json' : 'text/plain' });
           res.end(JSON.stringify(result));
         }
-      },
-        setNoCacheHeaders = function() {
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-          res.setHeader('Content-Disposition', 'inline; filename="files.json"');
-        },
-        handler = new UploadHandler(req, res, handleResult);
+      }, setNoCacheHeaders = function() {
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Content-Disposition', 'inline; filename="files.json"');
+      }, handler = new UploadHandler(req, res, handleResult);
       switch (req.method) {
         case 'OPTIONS':
           res.end();
@@ -245,13 +222,21 @@
       if (options.imageTypes.test(fileInfo.name)) {
         Object.keys(options.imageVersions).forEach(function(version) {
           counter += 1;
-          var opts = options.imageVersions[version];
-          imageMagick.resize({
-            width: opts.width,
-            height: opts.height,
-            srcPath: options.uploadDir + '/' + fileInfo.name,
-            dstPath: options.uploadDir + '/' + version + '/' + fileInfo.name
-          }, finish);
+          var opts = options.imageVersions[version],
+            srcPath = options.uploadDir + '/' + fileInfo.name,
+            dstPath = options.uploadDir + '/' + version + '/' + fileInfo.name;
+
+          gm(fs.createReadStream(srcPath))
+            .resize(opts.width, opts.height)
+            .crop(opts.width, opts.height)
+            .stream(function(err, stdout, stderr) {
+            if (err) return cb(err);
+
+            stdout.setMaxListeners(1000);
+            stdout.pipe(fs.createWriteStream(dstPath));
+
+            stdout.on('end', finish);
+          });
         });
       }
     }).on('aborted', function() {
@@ -292,4 +277,4 @@
   } else {
     require('http').createServer(serve).listen(port);
   }
-}(8888));
+}(1111));
